@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+        input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #ff0000;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #cc0000;
+        }
+        #downloadLinks {
+            margin-top: 1.5rem;
+            text-align: left;
+        }
+        #downloadLinks a {
+            display: block;
+            background-color: #e9e9e9;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            transition: background-color 0.3s;
+        }
+        #downloadLinks a:hover {
+            background-color: #dcdcdc;
+        }
+        #loader {
+            display: none;
+            margin-top: 1rem;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ff0000;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>YouTube Video & Audio Downloader</h1>
+        <input type="text" id="youtubeUrl" placeholder="Enter YouTube Video URL">
+        <button onclick="getDownloadLinks()">Get Download Links</button>
+        <div id="loader"></div>
+        <div id="downloadLinks"></div>
+    </div>
+
+    <script>
+        async function getDownloadLinks() {
+            const videoUrl = document.getElementById('youtubeUrl').value;
+            const downloadLinksDiv = document.getElementById('downloadLinks');
+            const loader = document.getElementById('loader');
+            downloadLinksDiv.innerHTML = '';
+
+            if (!videoUrl) {
+                alert('Please enter a YouTube URL');
+                return;
+            }
+
+            loader.style.display = 'block';
+
+            // This is a placeholder for a real API. In a real-world scenario,
+            // you would need a backend server to handle the request to a YouTube downloading API.
+            // For this example, we will simulate an API call with a timeout.
+            setTimeout(() => {
+                // This is a simplified example. A real implementation would require
+                // a backend service to fetch and parse the video information.
+                // The 'ytdl-core' library in a Node.js environment is a common solution.
+                // The following is a conceptual representation of what you would do.
+
+                // In a real backend, you would extract video ID and get formats.
+                // For this front-end only example, we cannot directly access YouTube's data
+                // due to CORS and other restrictions. This is a significant technical hurdle.
+
+                // The following is a mock response.
+                const mockResponse = {
+                    success: true,
+                    videoTitle: "Example YouTube Video Title",
+                    formats: [
+                        { quality: '1080p', type: 'video', url: '#' },
+                        { quality: '720p', type: 'video', url: '#' },
+                        { quality: '360p', type: 'video', url: '#' },
+                        { quality: '128kbps', type: 'audio', url: '#' }
+                    ]
+                };
+
+                if (mockResponse.success) {
+                    let linksHtml = `<h3>${mockResponse.videoTitle}</h3>`;
+                    mockResponse.formats.forEach(format => {
+                        const linkText = `${format.type.charAt(0).toUpperCase() + format.type.slice(1)} - ${format.quality}`;
+                        linksHtml += `<a href="${format.url}" download>${linkText}</a>`;
+                    });
+                    downloadLinksDiv.innerHTML = linksHtml;
+                } else {
+                    downloadLinksDiv.innerHTML = '<p>Could not fetch download links. Please check the URL.</p>';
+                }
+
+                loader.style.display = 'none';
+            }, 2000); // Simulate network delay
+        }
+    </script>
+
+</body>
+</html>
