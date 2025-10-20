@@ -2317,18 +2317,18 @@
                 element.textContent = 'Error';
                 errorsFound = true;
             };
-            if (results[0].status === 'fulfilled') elements.statTotalUsers.textContent = results[0].value.exists() ? results[0].value.size : 0;
+            if (results[0].status === 'fulfilled') elements.statTotalUsers.textContent = results[0].value.exists() ? results[0].value.numChildren() : 0;
             else {
                 console.error("Err Users:", results[0].reason);
                 setError(elements.statTotalUsers);
                 showStatus(elements.dashboardStatus, `Err Users: ${results[0].reason?.message}`, "warning");
             }
-            if (results[1].status === 'fulfilled') elements.statTotalGames.textContent = results[1].value.exists() ? results[1].value.size : 0;
+            if (results[1].status === 'fulfilled') elements.statTotalGames.textContent = results[1].value.exists() ? results[1].value.numChildren() : 0;
             else {
                 console.error("Err Games:", results[1].reason);
                 setError(elements.statTotalGames);
             }
-            if (results[2].status === 'fulfilled') elements.statTotalPromotions.textContent = results[2].value.exists() ? results[2].value.size : 0;
+            if (results[2].status === 'fulfilled') elements.statTotalPromotions.textContent = results[2].value.exists() ? results[2].value.numChildren() : 0;
             else {
                 console.error("Err Promos:", results[2].reason);
                 setError(elements.statTotalPromotions);
@@ -2353,7 +2353,7 @@
                 else showStatus(elements.dashboardStatus, `Err Tournaments: ${results[3].reason?.message}`, "warning");
             }
             if (results[4].status === 'fulfilled') {
-                const count = results[4].value.exists() ? results[4].value.size : 0;
+                const count = results[4].value.exists() ? results[4].value.numChildren() : 0;
                 elements.statPendingWithdrawals.textContent = count;
                 elements.pendingWithdrawalCountBadge.textContent = count;
                 elements.pendingWithdrawalCountBadge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -2365,13 +2365,13 @@
                 if (results[4].reason?.message?.includes("index")) showStatus(elements.dashboardStatus, "CRITICAL: Pending withdrawal query fail. Add '.indexOn': 'status' to '/withdrawals' rules.", "danger", false);
                 else showStatus(elements.dashboardStatus, `Err Pending Withdrawals: ${results[4].reason?.message}`, "warning");
             }
-            if (results[5].status === 'fulfilled') elements.statCompletedWithdrawals.textContent = results[5].value.exists() ? results[5].value.size : 0;
+            if (results[5].status === 'fulfilled') elements.statCompletedWithdrawals.textContent = results[5].value.exists() ? results[5].value.numChildren() : 0;
             else {
                 console.error("Err Completed Withdrawals:", results[5].reason);
                 setError(elements.statCompletedWithdrawals);
                 if (results[5].reason?.message?.includes("index")) showStatus(elements.dashboardStatus, "WARNING: Completed withdrawal query fail. Add '.indexOn': 'status' to '/withdrawals' rules.", "warning", false);
             }
-            if (results[6].status === 'fulfilled') elements.statRejectedWithdrawals.textContent = results[6].value.exists() ? results[6].value.size : 0;
+            if (results[6].status === 'fulfilled') elements.statRejectedWithdrawals.textContent = results[6].value.exists() ? results[6].value.numChildren() : 0;
             else {
                 console.error("Err Rejected Withdrawals:", results[6].reason);
                 setError(elements.statRejectedWithdrawals);
@@ -2422,7 +2422,7 @@
                 const snapshot = await get(promotionsRef);
                 let tableHtml = '';
                 if (snapshot.exists()) {
-                    promoCount = snapshot.size;
+                    promoCount = snapshot.numChildren();
                     snapshot.forEach(childSnapshot => {
                         const promoId = childSnapshot.key;
                         const promo = childSnapshot.val();
@@ -2607,7 +2607,7 @@
                 let count = 0;
 
                 if (snapshot.exists()) {
-                    count = snapshot.size;
+                    count = snapshot.numChildren();
                     const userIds = new Set();
                     snapshot.forEach(child => {
                         if (child.val()?.userId && !userDataCache[child.val().userId]) {
@@ -3694,7 +3694,7 @@
                 const gamesRef = ref(db, 'games');
                 const gamesSnap = await get(gamesRef);
                 let demoGameId = null;
-                if (!gamesSnap.exists() || gamesSnap.size === 0) {
+                if (!gamesSnap.exists() || gamesSnap.numChildren() === 0) {
                     const newRef = push(gamesRef);
                     demoGameId = newRef.key;
                     await set(newRef, {
@@ -3714,7 +3714,7 @@
                 }
                 const promoRef = ref(db, 'promotions');
                 const promoSnap = await get(promoRef);
-                if (!promoSnap.exists() || promoSnap.size === 0) {
+                if (!promoSnap.exists() || promoSnap.numChildren() === 0) {
                     await set(push(promoRef), {
                         imageUrl: "https://i.ibb.co/RGmQ420n/20250418-150709.jpg",
                         link: "#",
@@ -3725,7 +3725,7 @@
                 if (demoGameId) {
                     const tRef = ref(db, 'tournaments');
                     const tSnap = await get(tRef);
-                    if (!tSnap.exists() || tSnap.size === 0) {
+                    if (!tSnap.exists() || tSnap.numChildren() === 0) {
                         await set(push(tRef), {
                             gameId: demoGameId,
                             name: "Weekend Demo Clash",
@@ -3957,7 +3957,7 @@
             const pendingWdQuery = query(ref(db, 'withdrawals'), orderByChild('status'), equalTo('pending'));
             const wdKey = 'pendingWithdrawalsCount';
             dbListeners[wdKey] = onValue(pendingWdQuery, (snapshot) => {
-                const count = snapshot.exists() ? snapshot.size : 0;
+                const count = snapshot.exists() ? snapshot.numChildren() : 0;
                 if (elements.pendingWithdrawalCountBadge) {
                     elements.pendingWithdrawalCountBadge.textContent = count;
                     elements.pendingWithdrawalCountBadge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -3967,7 +3967,7 @@
             const pendingDpQuery = query(ref(db, 'deposits'), orderByChild('status'), equalTo('pending'));
             const dpKey = 'pendingDepositsCount';
             dbListeners[dpKey] = onValue(pendingDpQuery, (snapshot) => {
-                const count = snapshot.exists() ? snapshot.size : 0;
+                const count = snapshot.exists() ? snapshot.numChildren() : 0;
                 if (elements.pendingDepositCountBadge) {
                     elements.pendingDepositCountBadge.textContent = count;
                     elements.pendingDepositCountBadge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -3976,7 +3976,7 @@
             const pendingRfQuery = query(ref(db, 'pendingReferrals'), orderByChild('status'), equalTo('pending'));
             const rfKey = 'pendingReferralsCount';
             dbListeners[rfKey] = onValue(pendingRfQuery, (snapshot) => {
-                const count = snapshot.exists() ? snapshot.size : 0;
+                const count = snapshot.exists() ? snapshot.numChildren() : 0;
                 if (elements.pendingReferralCountBadge) {
                     elements.pendingReferralCountBadge.textContent = count;
                     elements.pendingReferralCountBadge.style.display = count > 0 ? 'inline-block' : 'none';
