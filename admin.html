@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Free Fire Tournaments • Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#2563EB" />
+  <!-- Firebase placeholders (compat) -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --bg-primary:   #F8FAFC;
+      --bg-secondary: #E2E8F0;
+      --text-dark:    #1E293B;
+      --accent-blue:  #2563EB;
+      --accent-gold:  #FBBF24;
+      --accent-red:   #DC2626;
+      --border:       #CBD5E1;
+      --radius: 16px; --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin:0; background: var(--bg-primary); color: var(--text-dark); font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial; }
+    .brand-title { font-family: 'Russo One', sans-serif; }
+
+    .app { max-width: 1100px; margin: 0 auto; padding-bottom: 80px; }
+    header.topbar { position: sticky; top:0; z-index: 20; background: var(--bg-primary); border-bottom: 1px solid var(--border); padding: 12px 14px; display:flex; justify-content: space-between; align-items: center; }
+    .container { padding: 14px; }
+    .grid { display:grid; gap:12px; }
+    @media (min-width: 860px) { .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); } .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    .card { background:#fff; border:1px solid var(--border); border-radius: var(--radius); padding:14px; display:flex; flex-direction:column; gap:10px; }
+    .title { font-weight:800; }
+    .muted { color:#64748B; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .row-wrap { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#fff; font-weight:700; }
+
+    .btn { --bg:#fff; --fg:var(--text-dark); --bd:var(--border); display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 12px; border-radius:12px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); font-weight:700; cursor:pointer; }
+    .btn-primary { --bg: var(--accent-blue); --fg:#fff; --bd: var(--accent-blue); }
+    .btn-danger { --bg: var(--accent-red); --fg:#fff; --bd: var(--accent-red); }
+
+    .tabs { display:flex; gap:8px; border-bottom:1px solid var(--border); padding-bottom:8px; }
+    .tab { background:transparent; border:none; cursor:pointer; padding:8px 10px; border-radius:999px; font-weight:800; }
+    .tab.active { background: var(--bg-secondary); }
+
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { text-align:left; padding:8px 10px; border-bottom: 1px solid var(--bg-secondary); }
+    .table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color:#475569; }
+
+    .modal { position: fixed; inset:0; background: rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index: 50; padding: 16px; }
+    .modal.open { display:flex; }
+    .modal-card { background:#fff; border:1px solid var(--border); border-radius:16px; width:100%; max-width:600px; padding:16px; }
+
+    .input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:#fff; font-weight:600; }
+    label { display:grid; gap:6px; font-weight:700; font-size:13px; }
+
+    .bottom-nav { position: fixed; bottom:0; left:0; right:0; z-index: 30; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns: repeat(5,1fr); }
+    .tab-item { padding: 10px 6px; display:grid; place-items:center; gap:4px; color:#475569; font-weight:800; }
+    .tab-item.active { color: var(--accent-blue); }
+
+    .icon { width:22px; height:22px; display:inline-block; }
+
+    .chart-placeholder { height: 220px; border-radius: 12px; border: 1px dashed var(--border); background: #F1F5F9; display:grid; place-items:center; }
+  </style>
+</head>
+<body>
+  <div class="app" id="app"></div>
+
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.23.1';
+    import { useEffect, useMemo, useState } from 'https://esm.sh/preact@10.23.1/hooks';
+    import htm from 'https://esm.sh/htm@3.1.1';
+    const html = htm.bind(h);
+
+    const LS_KEYS = {
+      users: 'ff_users',
+      tournaments: 'ff_tournaments',
+      registrations: 'ff_registrations',
+      payments: 'ff_payments',
+      settings: 'ff_settings'
+    };
+
+    function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } }
+    function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+    function uid(prefix = 'id') { return prefix + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); }
+    function currency(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
+
+    function useLocalStore(key, initial) {
+      const [value, setValue] = useState(() => loadJSON(key, initial));
+      useEffect(() => { saveJSON(key, value); }, [key, value]);
+      return [value, setValue];
+    }
+
+    function App() {
+      const [tab, setTab] = useState('dashboard');
+      const [tournaments, setTournaments] = useLocalStore(LS_KEYS.tournaments, []);
+      const [users, setUsers] = useLocalStore(LS_KEYS.users, {});
+      const [registrations, setRegistrations] = useLocalStore(LS_KEYS.registrations, []);
+      const [payments] = useLocalStore(LS_KEYS.payments, []);
+      const [settings, setSettings] = useLocalStore(LS_KEYS.settings, { razorpayKey: '', stripePublicKey: '', referralBonus: 10 });
+
+      const [query, setQuery] = useState('');
+      const [statusFilter, setStatusFilter] = useState('all');
+      const [modal, setModal] = useState({ open: false, mode: 'create', data: null });
+
+      // Derived metrics
+      const totalPlayers = Object.keys(users).length;
+      const totalTournaments = tournaments.length;
+      const onlinePlayers = useMemo(() => registrations.filter(r => (tournaments.find(t => t.id===r.tournId)?.status) === 'live').length, [registrations, tournaments]);
+      const walletHeld = useMemo(() => registrations.reduce((sum, r) => {
+        const t = tournaments.find(t => t.id === r.tournId);
+        if (!t) return sum; return sum + (t.entryFee || 0);
+      }, 0), [registrations, tournaments]);
+
+      function filteredTournaments() {
+        const q = query.toLowerCase();
+        return tournaments.filter(t => {
+          if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+          return !q || t.title.toLowerCase().includes(q) || String(t.map).toLowerCase().includes(q);
+        });
+      }
+
+      function openCreate() {
+        setModal({ open: true, mode: 'create', data: { title: '', matchTime: new Date(Date.now()+3600e3).toISOString().slice(0,16), map:'Bermuda', prize: 1000, entryFee: 50, roomId:'', roomPass:'', maxPlayers: 100, isRegistrationOpen: true, status:'upcoming' } });
+      }
+      function openEdit(t) { setModal({ open: true, mode: 'edit', data: { ...t } }); }
+      function saveTournament(data) {
+        if (modal.mode === 'create') {
+          const item = { ...data, id: uid('t'), joined: 0 };
+          setTournaments(prev => [item, ...prev]);
+        } else {
+          setTournaments(prev => prev.map(x => x.id === data.id ? { ...x, ...data } : x));
+        }
+        setModal({ open:false, mode:'create', data:null });
+      }
+
+      function bulkCloseRegistrations(ids) {
+        setTournaments(prev => prev.map(t => ids.includes(t.id) ? { ...t, isRegistrationOpen: false } : t));
+      }
+      function bulkDelete(ids) {
+        setTournaments(prev => prev.filter(t => !ids.includes(t.id)));
+        setRegistrations(prev => prev.filter(r => !ids.includes(r.tournId)));
+      }
+
+      // Players view helpers
+      const allPlayers = useMemo(() => Object.values(users), [users]);
+      function regForTournament(tId) { return registrations.filter(r => r.tournId === tId); }
+
+      // Analytics (lazy load chart lib)
+      async function ensureChart() {
+        if (window.Chart) return window.Chart;
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+          s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+        });
+        return window.Chart;
+      }
+
+      function Dashboard() {
+        return html`
+          <section class="grid grid-3">
+            <div class="card"><div class="title">Total Tournaments</div><div style="font-size:26px; font-weight:900;">${totalTournaments}</div></div>
+            <div class="card"><div class="title">Total Players</div><div style="font-size:26px; font-weight:900;">${totalPlayers}</div></div>
+            <div class="card"><div class="title">Online Players</div><div style="font-size:26px; font-weight:900;">${onlinePlayers}</div></div>
+            <div class="card"><div class="title">Wallet Balance Held</div><div style="font-size:26px; font-weight:900;">${currency(walletHeld)}</div></div>
+            <div class="card">
+              <div class="row"><div class="title">Quick Actions</div></div>
+              <div class="row-wrap">
+                <button class="btn btn-primary" onClick=${openCreate}>Create Tournament</button>
+                <button class="btn" onClick=${() => alert('Payments view placeholder')}>View Payments</button>
+                <button class="btn" onClick=${() => alert('Notification sent (placeholder)')}>Send Notification</button>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function TournamentsView() {
+        const [selected, setSelected] = useState([]);
+        function toggle(id) { setSelected(prev => prev.includes(id) ? prev.filter(x => x!==id) : [...prev, id]); }
+        const list = filteredTournaments();
+        return html`
+          <section class="grid">
+            <div class="row">
+              <div class="row" style="gap:8px;">
+                <input class="input" placeholder="Search by title/map" value=${query} onInput=${e => setQuery(e.currentTarget.value)} style="width:240px;" />
+                <select class="input" value=${statusFilter} onChange=${e => setStatusFilter(e.currentTarget.value)} style="width:160px;">
+                  ${['all','upcoming','live','past'].map(s => html`<option value=${s}>${s}</option>`)}
+                </select>
+              </div>
+              <div class="row" style="gap:8px;">
+                <button class="btn btn-primary" onClick=${openCreate}>Create</button>
+                <button class="btn" onClick=${() => bulkCloseRegistrations(selected)} disabled=${selected.length===0}>Close Reg</button>
+                <button class="btn btn-danger" onClick=${() => bulkDelete(selected)} disabled=${selected.length===0}>Delete</button>
+              </div>
+            </div>
+
+            <div class="card" style="overflow:auto;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th></th><th>Title</th><th>Time</th><th>Map</th><th>Prize</th><th>Fee</th><th>Joined</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${list.map(t => html`
+                    <tr key=${t.id}>
+                      <td><input type="checkbox" checked=${selected.includes(t.id)} onChange=${() => toggle(t.id)} /></td>
+                      <td>${t.title}</td>
+                      <td>${new Date(t.matchTime).toLocaleString()}</td>
+                      <td>${t.map}</td>
+                      <td>${currency(t.prize)}</td>
+                      <td>${currency(t.entryFee)}</td>
+                      <td>${t.joined}/${t.maxPlayers}</td>
+                      <td>${t.status}${t.isRegistrationOpen?'':' (closed)'}</td>
+                      <td>
+                        <button class="btn" onClick=${() => openEdit(t)}>Edit</button>
+                      </td>
+                    </tr>
+                  `)}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        `;
+      }
+
+      function PlayersView() {
+        const [q, setQ] = useState('');
+        const filtered = allPlayers.filter(p => !q || (p.name||'').toLowerCase().includes(q.toLowerCase()) || (p.ffUid||'').includes(q));
+        return html`
+          <section class="grid grid-2">
+            <div class="card">
+              <div class="row"><div class="title">Players</div><input class="input" placeholder="Search name/UID" value=${q} onInput=${e => setQ(e.currentTarget.value)} style="max-width:240px;"/></div>
+              <div class="grid">
+                ${filtered.map(p => html`
+                  <div class="row" key=${p.id}>
+                    <div>
+                      <div class="title">${p.name || 'Player'}</div>
+                      <div class="muted">FF UID: ${p.ffUid || '—'} • Wallet: ${currency(p.walletBalance||0)}</div>
+                      <div class="muted">Referrer: ${p.referrer || '—'}</div>
+                    </div>
+                    <div class="row-wrap"><span class="badge">${p.referralCode || ''}</span></div>
+                  </div>
+                `)}
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="title">Per-Tournament Registrations</div>
+              <div class="grid">
+                ${tournaments.map(t => html`
+                  <div>
+                    <div class="row">
+                      <div class="title">${t.title}</div>
+                      <span class="badge">${regForTournament(t.id).length}</span>
+                    </div>
+                    <div class="muted">${new Date(t.matchTime).toLocaleString()} • ${t.status}</div>
+                  </div>
+                `)}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function AnalyticsView() {
+        useEffect(() => { (async () => {
+          const Chart = await ensureChart();
+          const ctx1 = document.getElementById('signupsChart'); if (!ctx1) return;
+          const ctx2 = document.getElementById('revenueChart'); if (!ctx2) return;
+          const ctx3 = document.getElementById('referralsChart'); if (!ctx3) return;
+          const days = [...Array(7)].map((_,i) => new Date(Date.now() - (6-i)*86400000).toLocaleDateString());
+          const signups = days.map(() => Math.floor(Math.random()*20)+5);
+          const revenue = days.map(() => Math.floor(Math.random()*2000)+500);
+          const referrals = days.map(() => Math.floor(Math.random()*10));
+          new Chart(ctx1, { type:'line', data:{ labels: days, datasets: [{ label:'Daily sign-ups', data: signups, borderColor:'#2563EB', tension:.3 }] } });
+          new Chart(ctx2, { type:'bar', data:{ labels: days, datasets: [{ label:'Revenue (Entry fees)', data: revenue, backgroundColor:'#FBBF24' }] } });
+          new Chart(ctx3, { type:'line', data:{ labels: days, datasets: [{ label:'Referrals', data: referrals, borderColor:'#10B981', tension:.3 }] } });
+        })(); }, []);
+
+        const activePlayers = onlinePlayers;
+        const activePct = Math.min(100, Math.round((activePlayers / Math.max(1, Object.keys(users).length)) * 100));
+
+        return html`
+          <section class="grid">
+            <div class="grid grid-3">
+              <div class="card"><div class="title">Daily Sign-ups</div><canvas id="signupsChart" height="160"></canvas></div>
+              <div class="card"><div class="title">Revenue</div><canvas id="revenueChart" height="160"></canvas></div>
+              <div class="card"><div class="title">Referrals</div><canvas id="referralsChart" height="160"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="title">Real-time Active Players</div>
+              <div class="chart-placeholder">
+                <div style="text-align:center;">
+                  <div style="font-size:42px; font-weight:900;">${activePlayers}</div>
+                  <div class="muted">${activePct}% of player base</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function SettingsView() {
+        const s = settings;
+        return html`
+          <section class="grid grid-2">
+            <div class="card">
+              <div class="title">Payment Gateway</div>
+              <label>Razorpay Key<input class="input" value=${s.razorpayKey} onInput=${e => setSettings({ ...s, razorpayKey: e.currentTarget.value })} placeholder="rzp_test_..."/></label>
+              <label>Stripe Public Key<input class="input" value=${s.stripePublicKey} onInput=${e => setSettings({ ...s, stripePublicKey: e.currentTarget.value })} placeholder="pk_live_..."/></label>
+              <div class="muted">Keys are stored locally for demo. Do not use production keys here.</div>
+            </div>
+            <div class="card">
+              <div class="title">Referral Rules</div>
+              <label>Referral Bonus (INR)<input type="number" class="input" value=${s.referralBonus} onInput=${e => setSettings({ ...s, referralBonus: Number(e.currentTarget.value||0) })} /></label>
+              <button class="btn btn-primary" onClick=${() => alert('Saved (demo)')}>Save</button>
+            </div>
+            <div class="card">
+              <div class="title">Admin Users & Roles</div>
+              <div class="muted">Placeholder list — integrate with backend auth/roles.</div>
+              <ul>
+                <li>you@example.com — Super Admin</li>
+                <li>mod@example.com — Moderator</li>
+              </ul>
+            </div>
+          </section>
+        `;
+      }
+
+      function TournamentModal() {
+        const d = modal.data || {};
+        return html`
+          <div class=${'modal ' + (modal.open ? 'open':'')} role="dialog" aria-modal="true" aria-labelledby="tournTitle" onClick=${(e) => { if (e.target.classList.contains('modal')) setModal({ open:false, mode:'create', data:null }); }}>
+            <div class="modal-card" onClick=${e => e.stopPropagation()}>
+              <div class="row"><div id="tournTitle" class="title">${modal.mode==='create'?'Create':'Edit'} Tournament</div><button class="btn" onClick=${() => setModal({ open:false, mode:'create', data:null })}>Close</button></div>
+              <div class="grid" style="margin-top:10px;">
+                <label>Title<input class="input" value=${d.title||''} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, title: e.currentTarget.value } }))}/></label>
+                <label>Date & Time<input type="datetime-local" class="input" value=${(d.matchTime||'').slice(0,16)} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, matchTime: e.currentTarget.value } }))}/></label>
+                <label>Map<select class="input" value=${d.map||'Bermuda'} onChange=${e => setModal(m => ({ ...m, data: { ...m.data, map: e.currentTarget.value } }))}>
+                  ${['Bermuda','Kalahari','Purgatory','Alpine'].map(m => html`<option value=${m}>${m}</option>`)}
+                </select></label>
+                <label>Prize Pool (INR)<input type="number" class="input" value=${d.prize||0} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, prize: Number(e.currentTarget.value||0) } }))}/></label>
+                <label>Entry Fee (INR)<input type="number" class="input" value=${d.entryFee||0} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, entryFee: Number(e.currentTarget.value||0) } }))}/></label>
+                <label>Room ID<input class="input" value=${d.roomId||''} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, roomId: e.currentTarget.value } }))}/></label>
+                <label>Room Pass<input class="input" value=${d.roomPass||''} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, roomPass: e.currentTarget.value } }))}/></label>
+                <label>Max Players<input type="number" class="input" value=${d.maxPlayers||100} onInput=${e => setModal(m => ({ ...m, data: { ...m.data, maxPlayers: Number(e.currentTarget.value||0) } }))}/></label>
+                <label class="row">Registration Open <input type="checkbox" checked=${!!d.isRegistrationOpen} onChange=${e => setModal(m => ({ ...m, data: { ...m.data, isRegistrationOpen: e.currentTarget.checked } }))} /></label>
+                <label>Status<select class="input" value=${d.status||'upcoming'} onChange=${e => setModal(m => ({ ...m, data: { ...m.data, status: e.currentTarget.value } }))}>
+                  ${['upcoming','live','past'].map(s => html`<option value=${s}>${s}</option>`)}
+                </select></label>
+                <div class="row">
+                  <button class="btn btn-primary" style="width:100%;" onClick=${() => saveTournament(modal.data)}>Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return html`
+        <div>
+          <header class="topbar">
+            <div class="brand-title">Admin Panel</div>
+            <div class="row-wrap"><button class="btn" onClick=${() => alert('Secure login placeholder')}>Login</button></div>
+          </header>
+
+          <main class="container">
+            ${tab==='dashboard' && html`<${Dashboard}/>`}
+            ${tab==='tournaments' && html`<${TournamentsView}/>`}
+            ${tab==='players' && html`<${PlayersView}/>`}
+            ${tab==='analytics' && html`<${AnalyticsView}/>`}
+            ${tab==='settings' && html`<${SettingsView}/>`}
+          </main>
+
+          <nav class="bottom-nav" role="navigation" aria-label="Admin">
+            ${[
+              { id:'dashboard', label:'Dashboard', svg:'M3 12l9-9 9 9v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z' },
+              { id:'tournaments', label:'Tournaments', svg:'M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z' },
+              { id:'players', label:'Players', svg:'M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5 0-9 2.5-9 5v1h18v-1c0-2.5-4-5-9-5z' },
+              { id:'analytics', label:'Analytics', svg:'M4 18h4V6H4zm6 0h4V10h-4zm6 0h4V3h-4z' },
+              { id:'settings', label:'Settings', svg:'M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4z' }
+            ].map(t => html`
+              <button class=${'tab-item ' + (tab===t.id?'active':'')} onClick=${() => setTab(t.id)} aria-label=${t.label}>
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d=${t.svg}/></svg>
+                <span>${t.label}</span>
+              </button>
+            `)}
+          </nav>
+
+          <${TournamentModal}/>
+        </div>
+      `;
+    }
+
+    render(html`<${App}/>`, document.getElementById('app'));
+  </script>
+
+  <!-- Backend placeholders as per spec -->
+  <script>
+    const firebaseConfig = { /* add real keys here */ };
+    if (window.firebase) {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        firebase.auth().onAuthStateChanged(user => { /* secure admin auth here */ });
+        async function saveTournamentDoc(tournId, data) {
+          await db.collection('tournaments').doc(tournId).set(data, { merge: true });
+        }
+        window._adminDb = { db, saveTournamentDoc };
+      } catch (e) { console.warn('Firebase not configured:', e.message); }
+    }
+  </script>
+</body>
+</html>

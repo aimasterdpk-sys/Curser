@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Free Fire Tournaments • Player App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#2563EB" />
+  <!-- Optional gateways (loaded but unused until configured) -->
+  <script defer src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script defer src="https://js.stripe.com/v3/"></script>
+  <!-- Firebase placeholders (compat for simplicity in this vanilla build) -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --bg-primary:   #F8FAFC; /* soft white */
+      --bg-secondary: #E2E8F0; /* light gray */
+      --text-dark:    #1E293B; /* rich dark text */
+      --accent-blue:  #2563EB; /* brand blue */
+      --accent-gold:  #FBBF24; /* prize gold */
+      --accent-red:   #DC2626; /* alerts/danger */
+      --border:       #CBD5E1; /* soft outline */
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg-primary);
+      color: var(--text-dark);
+      font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .brand-title { font-family: 'Russo One', sans-serif; letter-spacing: 0.3px; }
+    .app {
+      max-width: 920px; margin: 0 auto; min-height: 100vh; padding-bottom: 76px;
+    }
+    header.topbar {
+      position: sticky; top: 0; z-index: 20;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+    }
+    .top-actions { display: flex; gap: 8px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border);
+      background: #fff; border-radius: 999px;
+    }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-weight: 600; }
+
+    .container { padding: 14px; }
+    .hero {
+      background: linear-gradient(140deg, #fff 0%, #EEF2FF 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+    }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; font-family: 'Russo One', sans-serif; }
+    .hero p { margin: 0; opacity: 0.9; }
+
+    .grid { display: grid; gap: 12px; }
+    @media (min-width: 680px) {
+      .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .card .title { font-weight: 700; }
+    .muted { color: #64748B; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .row-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+    .btn {
+      --bg: #fff; --fg: var(--text-dark); --bd: var(--border);
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 12px; border-radius: 12px; border: 1px solid var(--bd);
+      background: var(--bg); color: var(--fg); font-weight: 700; text-decoration: none; cursor: pointer;
+      transition: transform .08s ease, background .2s ease, color .2s ease, border-color .2s ease;
+      -webkit-user-select: none; user-select: none;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn:hover, .btn:focus-visible { outline: none; filter: brightness(0.98); }
+    .btn-primary { --bg: var(--accent-blue); --fg: #fff; --bd: var(--accent-blue); }
+    .btn-gold    { --bg: var(--accent-gold); --fg: #1F2937; --bd: #D97706; }
+    .btn-danger  { --bg: var(--accent-red); --fg: #fff; --bd: var(--accent-red); }
+    .btn-outline { --bg: #fff; --fg: var(--accent-blue); --bd: var(--accent-blue); }
+    .btn-ghost   { --bg: transparent; --fg: var(--text-dark); --bd: var(--border); }
+    .chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-weight: 700; font-size: 12px; }
+
+    .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .tab {
+      background: transparent; border: none; cursor: pointer; padding: 8px 10px; border-radius: 999px; font-weight: 800;
+    }
+    .tab.active { background: var(--bg-secondary); }
+
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; background: #fff;
+      border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr);
+    }
+    .tab-item { padding: 10px 6px; display: grid; place-items: center; gap: 4px; color: #475569; font-weight: 800; }
+    .tab-item.active { color: var(--accent-blue); }
+
+    .avatar { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--border); background: #fff; display: grid; place-items: center; font-weight: 800; }
+    .input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-weight: 600; }
+    .input:focus { outline: 2px solid rgba(37,99,235,.25); }
+    label { display: grid; gap: 8px; font-weight: 700; font-size: 13px; }
+
+    .modal {
+      position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+    }
+    .modal.open { display: flex; }
+    .modal-card { background: #fff; border-radius: 16px; border: 1px solid var(--border); width: 100%; max-width: 520px; padding: 16px; }
+
+    .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 14px; border-radius: 999px; font-weight: 700; z-index: 60; opacity: 0; transition: opacity .2s ease; }
+    .toast.show { opacity: 1; }
+
+    .icon { width: 22px; height: 22px; display: inline-block; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-weight: 800; }
+
+    /* Micro animation placeholders */
+    .anim-box { display: grid; place-items: center; height: 140px; border-radius: 12px; background: #F1F5F9; border: 1px dashed var(--border); }
+  </style>
+</head>
+<body>
+  <div class="app" id="app"></div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.23.1';
+    import { useEffect, useMemo, useRef, useState } from 'https://esm.sh/preact@10.23.1/hooks';
+    import htm from 'https://esm.sh/htm@3.1.1';
+    const html = htm.bind(h);
+
+    const LS_KEYS = {
+      users: 'ff_users',
+      tournaments: 'ff_tournaments',
+      registrations: 'ff_registrations',
+      payments: 'ff_payments',
+      settings: 'ff_settings',
+      walletTx: 'ff_wallet_transactions'
+    };
+
+    const CURRENT_USER_ID = 'me';
+
+    function loadJSON(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+    }
+    function saveJSON(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
+    function uid(prefix = 'id') {
+      return prefix + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+    }
+
+    function showToast(message) {
+      const el = document.getElementById('toast');
+      el.textContent = message; el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    // Lazy-load Lottie only when needed
+    let lottiePromise;
+    function loadLottie() {
+      if (!lottiePromise) {
+        lottiePromise = new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js';
+          s.onload = () => resolve(window.lottie);
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      return lottiePromise;
+    }
+
+    // Seed sample tournaments if none exist
+    function seedTournaments() {
+      const existing = loadJSON(LS_KEYS.tournaments, []);
+      if (existing.length) return existing;
+      const now = Date.now();
+      const samples = [
+        { id: uid('t'), title: 'Rapid Clash', matchTime: new Date(now + 3600e3).toISOString(), map: 'Bermuda', prize: 1000, entryFee: 50, roomId: '', roomPass: '', maxPlayers: 100, joined: 32, status: 'upcoming', isRegistrationOpen: true },
+        { id: uid('t'), title: 'Midnight Mayhem', matchTime: new Date(now + 3*3600e3).toISOString(), map: 'Kalahari', prize: 2000, entryFee: 75, roomId: '', roomPass: '', maxPlayers: 100, joined: 87, status: 'upcoming', isRegistrationOpen: true },
+        { id: uid('t'), title: 'Bermuda Blitz', matchTime: new Date(now - 1*3600e3).toISOString(), map: 'Bermuda', prize: 1500, entryFee: 50, roomId: '12345', roomPass: 'abcde', maxPlayers: 100, joined: 100, status: 'live', isRegistrationOpen: false },
+        { id: uid('t'), title: 'Desert Finals', matchTime: new Date(now - 48*3600e3).toISOString(), map: 'Kalahari', prize: 3000, entryFee: 100, roomId: '', roomPass: '', maxPlayers: 100, joined: 100, status: 'past', isRegistrationOpen: false },
+      ];
+      saveJSON(LS_KEYS.tournaments, samples);
+      return samples;
+    }
+
+    function initUser() {
+      const users = loadJSON(LS_KEYS.users, {});
+      if (!users[CURRENT_USER_ID]) {
+        const referralCode = 'FF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        users[CURRENT_USER_ID] = {
+          id: CURRENT_USER_ID,
+          name: 'Guest Player',
+          ffUid: '',
+          avatar: '',
+          walletBalance: 200,
+          referralCode,
+          referrer: null,
+          createdAt: Date.now()
+        };
+        saveJSON(LS_KEYS.users, users);
+      }
+      return users[CURRENT_USER_ID];
+    }
+
+    function useLocalStore(key, initial) {
+      const [value, setValue] = useState(() => loadJSON(key, initial));
+      useEffect(() => { saveJSON(key, value); }, [key, value]);
+      return [value, setValue];
+    }
+
+    function currency(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); }
+
+    async function processPayment(amount, meta = {}) {
+      // Try Razorpay if key configured in settings; else simulate success
+      const settings = loadJSON(LS_KEYS.settings, {});
+      if (amount <= 0) return { ok: true, id: uid('pay'), method: 'wallet' };
+
+      if (settings.razorpayKey && window.Razorpay) {
+        // Minimal Razorpay flow
+        const options = {
+          key: settings.razorpayKey,
+          amount: Math.round(amount * 100),
+          currency: 'INR',
+          name: 'Tournament Top-up',
+          description: meta.description || 'Wallet Top-up',
+          handler: function (response) {
+            // Handled in promise continuation
+          }
+        };
+        const rp = new window.Razorpay(options);
+        return new Promise((resolve) => {
+          rp.on('payment.success', function (resp) { resolve({ ok: true, id: resp.razorpay_payment_id, method: 'razorpay' }); });
+          rp.on('payment.error', function () { resolve({ ok: false }); });
+          rp.open();
+        });
+      }
+
+      if (settings.stripePublicKey && window.Stripe) {
+        // Placeholder Stripe flow
+        return { ok: true, id: uid('stripe'), method: 'stripe' };
+      }
+
+      // Simulated payment
+      await new Promise(r => setTimeout(r, 700));
+      return { ok: true, id: uid('sim'), method: 'simulated' };
+    }
+
+    function App() {
+      const [tab, setTab] = useState('home');
+      const [tournaments, setTournaments] = useLocalStore(LS_KEYS.tournaments, seedTournaments());
+      const [registrations, setRegistrations] = useLocalStore(LS_KEYS.registrations, []);
+      const [payments, setPayments] = useLocalStore(LS_KEYS.payments, []);
+      const [walletTx, setWalletTx] = useLocalStore(LS_KEYS.walletTx, []);
+      const [users, setUsers] = useLocalStore(LS_KEYS.users, {});
+
+      const me = useMemo(() => users[CURRENT_USER_ID] || initUser(), [users]);
+
+      const [regModal, setRegModal] = useState({ open: false, forTournamentId: null });
+      const [payModal, setPayModal] = useState({ open: false, amount: 100 });
+      const [tTab, setTTab] = useState('live'); // live | upcoming | past
+
+      useEffect(() => {
+        // Re-compute tournament statuses based on time
+        const now = Date.now();
+        setTournaments(prev => prev.map(t => {
+          const when = new Date(t.matchTime).getTime();
+          let status = t.status;
+          if (when < now - 60*60*1000) status = 'past';
+          else if (when <= now + 60*60*1000) status = 'live';
+          else status = 'upcoming';
+          return { ...t, status };
+        }));
+      }, []);
+
+      function joinedByMe(tId) {
+        return registrations.some(r => r.userId === me.id && r.tournId === tId && r.status !== 'cancelled');
+      }
+
+      function openJoin(t) {
+        if (!t.isRegistrationOpen || t.status !== 'upcoming') { showToast('Registrations closed'); return; }
+        setRegModal({ open: true, forTournamentId: t.id });
+      }
+
+      async function confirmJoin({ name, ffUid }) {
+        const t = tournaments.find(x => x.id === regModal.forTournamentId);
+        if (!t) return;
+        const need = t.entryFee;
+
+        // Update profile fields
+        setUsers(prev => ({ ...prev, [me.id]: { ...me, name: name || me.name, ffUid: ffUid || me.ffUid } }));
+
+        async function finalizeJoin() {
+          const reg = { id: uid('reg'), tournId: t.id, userId: me.id, timestamp: Date.now(), status: 'confirmed' };
+          setRegistrations(prev => [reg, ...prev]);
+          setTournaments(prev => prev.map(x => x.id === t.id ? { ...x, joined: Math.min(x.joined + 1, x.maxPlayers) } : x));
+          setRegModal({ open: false, forTournamentId: null });
+          showToast('Joined ' + t.title);
+          await loadLottie().then(l => {
+            const box = document.getElementById('join-anim'); if (!box) return;
+            l.loadAnimation({ container: box, renderer: 'svg', loop: false, autoplay: true, path: 'https://assets10.lottiefiles.com/packages/lf20_jbrw3hcz.json' });
+          }).catch(() => {});
+        }
+
+        // If wallet has enough, deduct; else trigger top-up, then deduct
+        if (me.walletBalance >= need) {
+          setUsers(prev => ({ ...prev, [me.id]: { ...me, walletBalance: me.walletBalance - need } }));
+          setWalletTx(prev => [{ id: uid('w'), userId: me.id, amount: -need, type: 'join', meta: { tournId: t.id }, timestamp: Date.now() }, ...prev]);
+          await finalizeJoin();
+          return;
+        }
+        const short = Math.max(0, need - me.walletBalance);
+        const res = await processPayment(short, { description: 'Pay & Join ' + t.title });
+        if (!res.ok) { showToast('Payment failed'); return; }
+        // Record payment & top-up wallet, then deduct entry fee
+        setPayments(prev => [{ id: res.id, userId: me.id, amount: short, method: res.method, status: 'captured', purpose: 'join', timestamp: Date.now() }, ...prev]);
+        setUsers(prev => ({ ...prev, [me.id]: { ...me, walletBalance: me.walletBalance + short - need } }));
+        setWalletTx(prev => [
+          { id: uid('w'), userId: me.id, amount: short, type: 'topup', meta: { method: res.method }, timestamp: Date.now() },
+          { id: uid('w'), userId: me.id, amount: -need, type: 'join',  meta: { tournId: t.id }, timestamp: Date.now() },
+          ...prev
+        ]);
+        await finalizeJoin();
+      }
+
+      function cancelRegistration(regId) {
+        const reg = registrations.find(r => r.id === regId && r.userId === me.id);
+        if (!reg) return;
+        const t = tournaments.find(x => x.id === reg.tournId);
+        if (!t || t.status !== 'upcoming') { showToast('Cannot cancel now'); return; }
+        // Refund entry fee
+        setUsers(prev => ({ ...prev, [me.id]: { ...me, walletBalance: me.walletBalance + t.entryFee } }));
+        setWalletTx(prev => [{ id: uid('w'), userId: me.id, amount: t.entryFee, type: 'refund', meta: { tournId: t.id }, timestamp: Date.now() }, ...prev]);
+        setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: 'cancelled' } : r));
+        setTournaments(prev => prev.map(x => x.id === t.id ? { ...x, joined: Math.max(0, x.joined - 1) } : x));
+        showToast('Registration cancelled');
+      }
+
+      async function topUp(amount) {
+        amount = Math.max(1, Math.floor(Number(amount) || 0));
+        const res = await processPayment(amount, { description: 'Wallet Top-up' });
+        if (!res.ok) { showToast('Payment failed'); return; }
+        setPayments(prev => [{ id: res.id, userId: me.id, amount, method: res.method, status: 'captured', purpose: 'topup', timestamp: Date.now() }, ...prev]);
+        setUsers(prev => ({ ...prev, [me.id]: { ...me, walletBalance: me.walletBalance + amount } }));
+        setWalletTx(prev => [{ id: uid('w'), userId: me.id, amount, type: 'topup', meta: { method: res.method }, timestamp: Date.now() }, ...prev]);
+        setPayModal({ open: false, amount: 100 });
+        showToast('Wallet topped up');
+        // Payment success animation
+        await loadLottie().then(l => {
+          const box = document.getElementById('pay-anim'); if (!box) return;
+          l.loadAnimation({ container: box, renderer: 'svg', loop: false, autoplay: true, path: 'https://assets1.lottiefiles.com/private_files/lf30_editor_0j0dzjkp.json' });
+        }).catch(() => {});
+      }
+
+      const myRegistrations = useMemo(() => registrations
+        .filter(r => r.userId === me.id)
+        .sort((a,b) => b.timestamp - a.timestamp)
+      , [registrations, me.id]);
+
+      const refCount = useMemo(() => {
+        const all = loadJSON(LS_KEYS.users, {});
+        return Object.values(all).filter(u => u.referrer === me.id).length;
+      }, [users]);
+
+      const filteredTournaments = useMemo(() => tournaments.filter(t => t.status === tTab), [tournaments, tTab]);
+
+      function ShareButtons() {
+        const link = location.origin + location.pathname + '?ref=' + me.id;
+        const text = encodeURIComponent('Join Free Fire tourneys with my code ' + (me.referralCode || '') + ' ' + link);
+        return html`
+          <div class="row-wrap">
+            <a class="btn btn-outline" href=${'https://wa.me/?text=' + text} target="_blank" rel="noreferrer">WhatsApp</a>
+            <a class="btn btn-outline" href=${'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + text} target="_blank" rel="noreferrer">Telegram</a>
+            <button class="btn" onClick=${async () => {
+              try { await navigator.clipboard.writeText(link); showToast('Link copied'); } catch { showToast('Copy failed'); }
+            }}>Copy Link</button>
+            ${navigator.share ? html`<button class="btn" onClick=${() => navigator.share({ title: 'Free Fire Tournaments', text: 'Play with me!', url: link })}>Share</button>` : null}
+          </div>
+        `;
+      }
+
+      useEffect(() => {
+        // Read referrer from query once
+        const url = new URL(location.href);
+        const ref = url.searchParams.get('ref');
+        if (ref && !me.referrer && ref !== me.id) {
+          setUsers(prev => ({ ...prev, [me.id]: { ...me, referrer: ref } }));
+          showToast('Referral applied');
+        }
+      }, []);
+
+      const nowFmt = (iso) => new Date(iso).toLocaleString();
+
+      return html`
+        <div>
+          <header class="topbar">
+            <div class="row">
+              <span class="brand-title">Free Fire Tournaments</span>
+            </div>
+            <div class="top-actions">
+              <span class="badge">Wallet: ${currency(me.walletBalance)}</span>
+              <button class="btn btn-primary" onClick=${() => setPayModal({ open: true, amount: 100 })}>Top-up</button>
+            </div>
+          </header>
+
+          <main class="container">
+            ${tab === 'home' && html`
+              <section class="grid">
+                <div class="hero">
+                  <div>
+                    <h1 class="brand-title">Free Fire Tournaments</h1>
+                    <p>Daily brackets, fast payouts, and verified rooms. Join the arena now.</p>
+                    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap: wrap;">
+                      <button class="btn btn-gold" onClick=${() => { setTab('tournaments'); setTTab('live'); }}>Play Now</button>
+                      <a class="btn" href="#rules" onClick=${e => { e.preventDefault(); showToast('Rules coming soon'); }}>Rules</a>
+                    </div>
+                  </div>
+                  <div class="anim-box" id="join-anim" aria-hidden="true"></div>
+                </div>
+
+                <div class="grid grid-2">
+                  <div class="card">
+                    <div class="row"><div class="title">Next Up</div><span class="chip">${filteredTournaments[0]?.title || '—'}</span></div>
+                    <div class="muted">${filteredTournaments[0] ? nowFmt(filteredTournaments[0].matchTime) : 'No events'}</div>
+                    <div class="row">
+                      <button class="btn btn-primary" onClick=${() => setTab('tournaments')}>Browse</button>
+                      <button class="btn" onClick=${() => setTab('profile')}>Profile</button>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="row"><div class="title">Referrals</div><span class="chip">${refCount} Friends</span></div>
+                    <div>Your code: <span class="mono">${me.referralCode}</span></div>
+                    ${ShareButtons()}
+                  </div>
+                </div>
+              </section>
+            `}
+
+            ${tab === 'tournaments' && html`
+              <section class="grid">
+                <div class="tabs" role="tablist">
+                  ${['live','upcoming','past'].map(kind => html`
+                    <button role="tab" aria-selected=${tTab===kind} class=${'tab ' + (tTab===kind?'active':'')} onClick=${() => setTTab(kind)}>
+                      ${kind[0].toUpperCase()+kind.slice(1)}
+                    </button>
+                  `)}
+                </div>
+                <div class="grid grid-2">
+                  ${filteredTournaments.map(t => html`
+                    <article class="card" key=${t.id} aria-label=${t.title}>
+                      <div class="row"><div class="title">${t.title}</div><span class="chip">${t.map}</span></div>
+                      <div class="muted">${nowFmt(t.matchTime)}</div>
+                      <div class="row-wrap">
+                        <span class="badge">Prize <span class="mono" style="color:var(--accent-gold);">${currency(t.prize)}</span></span>
+                        <span class="badge">Fee ${currency(t.entryFee)}</span>
+                        <span class="badge">${t.joined}/${t.maxPlayers}</span>
+                      </div>
+                      <div class="row">
+                        ${joinedByMe(t.id)
+                          ? html`<button class="btn btn-ghost" disabled>Joined</button>`
+                          : (t.status==='upcoming' && t.isRegistrationOpen
+                            ? html`<button class="btn btn-primary" onClick=${() => openJoin(t)}>Join</button>`
+                            : html`<button class="btn" disabled>Closed</button>`)}
+                        <button class="btn" onClick=${() => showToast('Details coming soon')}>Details</button>
+                      </div>
+                    </article>
+                  `)}
+                </div>
+              </section>
+            `}
+
+            ${tab === 'refer' && html`
+              <section class="grid">
+                <div class="card">
+                  <div class="row"><div class="title">Refer & Earn</div><span class="chip">${refCount} joined</span></div>
+                  <p>Share your code and earn bonus credits when friends sign up.</p>
+                  <div>Your code: <span class="mono">${me.referralCode}</span></div>
+                  ${ShareButtons()}
+                </div>
+                <div class="card">
+                  <div class="title">Referral Perks</div>
+                  <ul>
+                    <li>Friend signs up with your link → you both get bonus</li>
+                    <li>Bonus is credited to wallet automatically</li>
+                    <li>Works only for first-time sign-ups</li>
+                  </ul>
+                </div>
+              </section>
+            `}
+
+            ${tab === 'profile' && html`
+              <section class="grid">
+                <div class="card">
+                  <div class="row">
+                    <div class="row" style="gap:12px;">
+                      <div class="avatar">${me.name?.[0] || 'U'}</div>
+                      <div>
+                        <div class="title">${me.name || 'Guest Player'}</div>
+                        <div class="muted">FF UID: ${me.ffUid || '—'}</div>
+                      </div>
+                    </div>
+                    <div class="row" style="gap:8px;">
+                      <span class="badge">Wallet: ${currency(me.walletBalance)}</span>
+                      <button class="btn btn-primary" onClick=${() => setPayModal({ open: true, amount: 100 })}>Top-up</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="row"><div class="title">My Registrations</div><span class="chip">${myRegistrations.length}</span></div>
+                  <div class="grid">
+                    ${myRegistrations.length === 0 && html`<div class="muted">No registrations yet.</div>`}
+                    ${myRegistrations.map(r => {
+                      const t = tournaments.find(x => x.id === r.tournId) || { title: 'Event', entryFee: 0, status:'past' };
+                      return html`
+                        <div class="row" key=${r.id}>
+                          <div>
+                            <div class="title">${t.title}</div>
+                            <div class="muted">${new Date(r.timestamp).toLocaleString()} • ${t.status}</div>
+                          </div>
+                          <div class="row" style="gap:6px;">
+                            ${r.status !== 'cancelled' && t.status==='upcoming' ? html`<button class="btn btn-danger" onClick=${() => cancelRegistration(r.id)}>Cancel</button>` : html`<span class="chip">${r.status}</span>`}
+                          </div>
+                        </div>`;
+                    })}
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="title">Payment Success</div>
+                  <div id="pay-anim" class="anim-box" aria-hidden="true"></div>
+                </div>
+              </section>
+            `}
+          </main>
+
+          <nav class="bottom-nav" role="navigation" aria-label="Primary">
+            ${[
+              { id:'home', label:'Home', svg:'M3 12l9-9 9 9v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z' },
+              { id:'tournaments', label:'Tournaments', svg:'M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z' },
+              { id:'refer', label:'Refer', svg:'M12 2a5 5 0 0 1 5 5c0 3-5 9-5 9s-5-6-5-9a5 5 0 0 1 5-5z' },
+              { id:'profile', label:'Profile', svg:'M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5 0-9 2.5-9 5v1h18v-1c0-2.5-4-5-9-5z' },
+            ].map(t => html`
+              <button class=${'tab-item ' + (tab===t.id?'active':'')} onClick=${() => setTab(t.id)} aria-label=${t.label}>
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d=${t.svg}/></svg>
+                <span>${t.label}</span>
+              </button>
+            `)}
+          </nav>
+
+          <!-- Registration Modal -->
+          <div class=${'modal ' + (regModal.open ? 'open':'')} role="dialog" aria-modal="true" aria-labelledby="regTitle" onClick=${(e) => { if (e.target.classList.contains('modal')) setRegModal({ open:false, forTournamentId:null }); }}>
+            <div class="modal-card" onClick=${e => e.stopPropagation()}>
+              <div class="row"><div id="regTitle" class="title">Tournament Registration</div><button class="btn" onClick=${() => setRegModal({ open:false, forTournamentId:null })}>Close</button></div>
+              <div class="grid" style="margin-top:10px;">
+                <label>Name<input class="input" id="regName" placeholder="Your name" defaultValue=${me.name || ''} /></label>
+                <label>Free Fire UID<input class="input" id="regUid" placeholder="Enter UID" defaultValue=${me.ffUid || ''} /></label>
+                <div class="row">
+                  <button class="btn btn-primary" style="width:100%;" onClick=${() => {
+                    const name = document.getElementById('regName').value.trim();
+                    const ffUid = document.getElementById('regUid').value.trim();
+                    confirmJoin({ name, ffUid });
+                  }}>Pay & Join</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top-up Modal -->
+          <div class=${'modal ' + (payModal.open ? 'open':'')} role="dialog" aria-modal="true" aria-labelledby="payTitle" onClick=${(e) => { if (e.target.classList.contains('modal')) setPayModal({ open:false, amount:100 }); }}>
+            <div class="modal-card" onClick=${e => e.stopPropagation()}>
+              <div class="row"><div id="payTitle" class="title">Wallet Top-up</div><button class="btn" onClick=${() => setPayModal({ open:false, amount:100 })}>Close</button></div>
+              <div class="grid" style="margin-top:10px;">
+                <label>Amount (INR)<input class="input" id="topupAmt" type="number" min="1" step="1" value=${payModal.amount} onInput=${e => setPayModal(m => ({ ...m, amount: e.currentTarget.value }))} /></label>
+                <button class="btn btn-primary" onClick=${() => topUp(Number(payModal.amount))}>Pay</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    render(html`<${App}/>`, document.getElementById('app'));
+  </script>
+
+  <!-- Backend placeholders (non-functional) required by spec -->
+  <script>
+    // Firebase / Firestore config placeholder
+    const firebaseConfig = { /* add real keys here */ };
+    if (window.firebase) {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        firebase.auth().onAuthStateChanged(user => { /* handle auth state */ });
+
+        // User joins tournament placeholder
+        async function joinTournament(tournId, userId) {
+          const entryFee = 50; // dynamic in real app
+          async function processPayment(amount) { return true; }
+          const paid = await processPayment(entryFee);
+          if (!paid) return false;
+          await db.collection('tournaments').doc(tournId)
+            .collection('registrations').add({ userId, timestamp: Date.now() });
+          const newBalance = 0; // compute
+          await db.collection('users').doc(userId).update({ walletBalance: newBalance });
+        }
+      } catch (e) {
+        console.warn('Firebase not configured:', e.message);
+      }
+    }
+  </script>
+</body>
+</html>
