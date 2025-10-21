@@ -24,6 +24,11 @@
       --border:       #CBD5E1; /* soft outline */
       --radius: 16px;
       --radius-sm: 10px;
+      /* enhanced */
+      --surface: #FFFFFF;
+      --focus-ring: rgba(37, 99, 235, .28);
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.06);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -42,7 +47,9 @@
     }
     header.topbar {
       position: sticky; top: 0; z-index: 20;
-      background: var(--bg-primary);
+      background: rgba(248, 250, 252, 0.85);
+      -webkit-backdrop-filter: saturate(130%) blur(10px);
+      backdrop-filter: saturate(130%) blur(10px);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 14px;
@@ -60,6 +67,7 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 18px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+      box-shadow: var(--shadow-sm);
     }
     .hero h1 { margin: 0 0 6px; font-size: 24px; font-family: 'Russo One', sans-serif; }
     .hero p { margin: 0; opacity: 0.9; }
@@ -71,9 +79,12 @@
     }
 
     .card {
-      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 14px; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: var(--shadow-sm);
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
     }
+    .card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
     .card .title { font-weight: 700; }
     .muted { color: #64748B; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -84,11 +95,13 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       padding: 10px 12px; border-radius: 12px; border: 1px solid var(--bd);
       background: var(--bg); color: var(--fg); font-weight: 700; text-decoration: none; cursor: pointer;
-      transition: transform .08s ease, background .2s ease, color .2s ease, border-color .2s ease;
+      transition: transform .08s ease, background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, filter .2s ease;
       -webkit-user-select: none; user-select: none;
     }
     .btn:active { transform: translateY(1px); }
-    .btn:hover, .btn:focus-visible { outline: none; filter: brightness(0.98); }
+    .btn:hover { filter: brightness(0.98); }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+    .btn:disabled, .btn[disabled] { opacity: .55; cursor: not-allowed; filter: none; }
     .btn-primary { --bg: var(--accent-blue); --fg: #fff; --bd: var(--accent-blue); }
     .btn-gold    { --bg: var(--accent-gold); --fg: #1F2937; --bd: #D97706; }
     .btn-danger  { --bg: var(--accent-red); --fg: #fff; --bd: var(--accent-red); }
@@ -100,18 +113,24 @@
     .tab {
       background: transparent; border: none; cursor: pointer; padding: 8px 10px; border-radius: 999px; font-weight: 800;
     }
+    .tab:hover { background: rgba(226,232,240,.6); }
     .tab.active { background: var(--bg-secondary); }
+    .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 
     .bottom-nav {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; background: #fff;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 30; background: rgba(255,255,255,0.9);
+      -webkit-backdrop-filter: saturate(130%) blur(10px);
+      backdrop-filter: saturate(130%) blur(10px);
       border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr);
+      box-shadow: 0 -1px 0 var(--border);
     }
     .tab-item { padding: 10px 6px; display: grid; place-items: center; gap: 4px; color: #475569; font-weight: 800; }
     .tab-item.active { color: var(--accent-blue); }
 
     .avatar { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--border); background: #fff; display: grid; place-items: center; font-weight: 800; }
-    .input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-weight: 600; }
-    .input:focus { outline: 2px solid rgba(37,99,235,.25); }
+    .input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-weight: 600; transition: box-shadow .15s ease, border-color .15s ease; }
+    .input::placeholder { color: #94A3B8; }
+    .input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--focus-ring); }
     label { display: grid; gap: 8px; font-weight: 700; font-size: 13px; }
 
     .modal {
@@ -120,14 +139,18 @@
     .modal.open { display: flex; }
     .modal-card { background: #fff; border-radius: 16px; border: 1px solid var(--border); width: 100%; max-width: 520px; padding: 16px; }
 
-    .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 14px; border-radius: 999px; font-weight: 700; z-index: 60; opacity: 0; transition: opacity .2s ease; }
-    .toast.show { opacity: 1; }
+    .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 14px; border-radius: 999px; font-weight: 700; z-index: 60; opacity: 0; transition: opacity .2s ease, transform .2s ease; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(-2px); }
 
     .icon { width: 22px; height: 22px; display: inline-block; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-weight: 800; }
 
     /* Micro animation placeholders */
     .anim-box { display: grid; place-items: center; height: 140px; border-radius: 12px; background: #F1F5F9; border: 1px dashed var(--border); }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
   </style>
 </head>
 <body>
